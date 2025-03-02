@@ -54,11 +54,11 @@ def a_star_search(maze_data, heuristic):
                     f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, goal)
                     heapq.heappush(open_list, (f_score[neighbor], neighbor))
     
-    return None, visited_nodes  # No path found
+    return None, visited_nodes
 
 def visualize_maze(maze_data, path):
     maze = np.array(maze_data['maze'])
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     
     ax.imshow(maze, cmap='gray_r')
     
@@ -75,31 +75,36 @@ def visualize_maze(maze_data, path):
     
     plt.show()
 
-def compare_heuristics(file_path):
-    maze_data = load_maze(file_path)
-    
-    print("Testing Manhattan heuristic...")
-    start_time = time.time()
-    path_manhattan, visited_manhattan = a_star_search(maze_data, heuristic_manhattan)
-    manhattan_time = time.time() - start_time
-    print(f"Visited nodes: {visited_manhattan}, Time: {manhattan_time:.6f} sec")
-    visualize_maze(maze_data, path_manhattan)
-    
-    print("\nTesting Euclidean heuristic...")
-    start_time = time.time()
-    path_euclidean, visited_euclidean = a_star_search(maze_data, heuristic_euclidean)
-    euclidean_time = time.time() - start_time
-    print(f"Visited nodes: {visited_euclidean}, Time: {euclidean_time:.6f} sec")
-    visualize_maze(maze_data, path_euclidean)
-    
-    return {
-        "manhattan": {"path_length": len(path_manhattan) if path_manhattan else 0, "visited_nodes": visited_manhattan, "time": manhattan_time},
-        "euclidean": {"path_length": len(path_euclidean) if path_euclidean else 0, "visited_nodes": visited_euclidean, "time": euclidean_time}
-    }
+def compare_heuristics(file_paths):
+    results = {}
+    for file_path in file_paths:
+        maze_data = load_maze(file_path)
+        
+        start_time = time.perf_counter()
+        path_manhattan, visited_manhattan = a_star_search(maze_data, heuristic_manhattan)
+        manhattan_time = time.perf_counter() - start_time
+        visualize_maze(maze_data, path_manhattan)
+        
+        start_time = time.perf_counter()
+        path_euclidean, visited_euclidean = a_star_search(maze_data, heuristic_euclidean)
+        euclidean_time = time.perf_counter() - start_time
+        visualize_maze(maze_data, path_euclidean)
 
-# Запуск сравнения
+        results[file_path] = {
+            "manhattan": {"path_length": len(path_manhattan) if path_manhattan else 0, "visited_nodes": visited_manhattan, "time": manhattan_time},
+            "euclidean": {"path_length": len(path_euclidean) if path_euclidean else 0, "visited_nodes": visited_euclidean, "time": euclidean_time}
+        }
+    
+    return results
+
 if __name__ == "__main__":
-    file_path = "./Lab3/maze.json"  # Укажи путь к файлу с лабиринтом
-    results = compare_heuristics(file_path)
-    print("\nComparison results:")
-    print(results)
+    file_paths = [
+        "./Lab3/maze1.json",
+        "./Lab3/maze2.json"
+    ]
+    results = compare_heuristics(file_paths)
+    
+    for file_path, result in results.items():
+        print(f"\nMaze from {file_path}:")
+        print(f"Manhattan Heuristic: Path Length = {result['manhattan']['path_length']}, Visited Nodes = {result['manhattan']['visited_nodes']}, Time = {result['manhattan']['time']:.6f} sec")
+        print(f"Euclidean Heuristic: Path Length = {result['euclidean']['path_length']}, Visited Nodes = {result['euclidean']['visited_nodes']}, Time = {result['euclidean']['time']:.6f} sec")

@@ -1,13 +1,66 @@
 import heapq
-from collections import deque
-import networkx as nx
-import matplotlib.pyplot as plt
 import time
-import numpy as np
+import random
+import matplotlib.pyplot as plt
+import networkx as nx
 
-# Примеры графов
+def dfs(graph, start, visited=None):
+    if visited is None:
+        visited = set()
+    visited.add(start)
+    order = [start]
+    for next_vertex in sorted(graph[start] - visited):
+        order.extend(dfs(graph, next_vertex, visited))
+    return order
 
-# Малый невзвешенный граф
+def bfs(graph, start, target=None):
+    visited = set()
+    queue = [start]
+    order = []
+    while queue:
+        vertex = queue.pop(0)
+        if vertex not in visited:
+            visited.add(vertex)
+            order.append(vertex)
+            if target is not None and vertex == target:
+                break
+            queue.extend(sorted(graph[vertex] - visited))
+    return order
+
+def dijkstra(graph, start, target=None):
+    visited = set()
+    pq = [(0, start)]
+    order = []
+    while pq:
+        _, vertex = heapq.heappop(pq)
+        if vertex in visited:
+            continue
+        visited.add(vertex)
+        order.append(vertex)
+        if target is not None and vertex == target:
+            break
+        for neighbor in sorted(graph[vertex]):
+            if neighbor not in visited:
+                heapq.heappush(pq, (0, neighbor))
+    return order
+
+def visualize_graph(graph, title="Граф"):
+    G = nx.Graph()
+    for vertex in graph:
+        for neighbor in graph[vertex]:
+            G.add_edge(vertex, neighbor)
+    pos = nx.spring_layout(G)
+    plt.figure(figsize=(8, 6))
+    nx.draw(G, pos, with_labels=True, node_color='lightblue', node_size=500, font_size=10)
+    plt.title(title)
+    plt.show()
+
+def measure_time(algorithm, graph, start):
+    start_time = time.perf_counter()
+    result = algorithm(graph, start)
+    elapsed_time = time.perf_counter() - start_time
+    return elapsed_time, result
+
 small_graph = {
     0: {1, 2},
     1: {0, 3, 4},
@@ -16,7 +69,6 @@ small_graph = {
     4: {1, 2, 3}
 }
 
-# Средний невзвешенный граф (ручное задание связей)
 medium_graph = {
     0: {1, 2, 3},
     1: {0, 4, 5},
@@ -40,106 +92,33 @@ medium_graph = {
     19: {8, 17, 18}
 }
 
-# Граф со взвешенными рёбрами
-weighted_graph = {
-    0: {1: 4, 2: 1},
-    1: {0: 4, 3: 1},
-    2: {0: 1, 3: 2},
-    3: {1: 1, 2: 2, 4: 3},
-    4: {3: 3}
-}
+for graph, name in [(small_graph, "Малый граф"), (medium_graph, "Средний граф")]:
+    print(f"\n{name}:")
+    visualize_graph(graph, title=name)
+    for algorithm, label in [(bfs, "BFS"), (dfs, "DFS"), (dijkstra, "Дейкстра")]:
+        time_taken, order = measure_time(algorithm, graph, 0)
+        print(f"{label}: {time_taken:.6f} сек, Порядок обхода: {order}")
 
-# Функции алгоритмов
+sizes = [10, 20, 40, 60, 80, 100]
+bfs_times = []
+dfs_times = []
+dijkstra_times = []
 
-def bfs(graph, start):
-    visited = set()
-    queue = deque([start])
-    order = []
-    while queue:
-        vertex = queue.popleft()
-        if vertex not in visited:
-            visited.add(vertex)
-            order.append(vertex)
-            queue.extend(graph[vertex] - visited)
-    return order
+for size in sizes:
+    random_graph = {i: set(random.sample(range(size), random.randint(1, min(5, size-1)))) for i in range(size)}
+    print(f"\nСлучайный граф из {size} вершин")
+    for algorithm, times_list, label in [(bfs, bfs_times, "BFS"), (dfs, dfs_times, "DFS"), (dijkstra, dijkstra_times, "Дейкстра")]:
+        time_taken, _ = measure_time(algorithm, random_graph, 0)
+        times_list.append(time_taken)
+        print(f"{label}: {time_taken:.6f} сек")
 
-def dfs(graph, start, visited=None):
-    if visited is None:
-        visited = set()
-    order = []
-    stack = [start]
-    while stack:
-        vertex = stack.pop()
-        if vertex not in visited:
-            visited.add(vertex)
-            order.append(vertex)
-            stack.extend(graph[vertex] - visited)
-    return order
-
-def dijkstra(graph, start):
-    distances = {vertex: float('infinity') for vertex in graph}
-    distances[start] = 0
-    priority_queue = [(0, start)]
-    while priority_queue:
-        current_distance, current_vertex = heapq.heappop(priority_queue)
-        if current_distance > distances[current_vertex]:
-            continue
-        for neighbor, weight in graph[current_vertex].items():
-            distance = current_distance + weight
-            if distance < distances[neighbor]:
-                distances[neighbor] = distance
-                heapq.heappush(priority_queue, (distance, neighbor))
-    return distances
-
-def draw_graph(graph, title="Граф"):
-    G = nx.Graph()
-    for node, neighbors in graph.items():
-        for neighbor in neighbors:
-            if isinstance(neighbors, dict):
-                G.add_edge(node, neighbor, weight=neighbors[neighbor])
-            else:
-                G.add_edge(node, neighbor)
-    pos = nx.spring_layout(G)
-    plt.figure(figsize=(8, 6))
-    nx.draw(G, pos, with_labels=True, node_color='lightblue', edge_color='gray', node_size=500, font_size=10)
-    if any(isinstance(neighbors, dict) for neighbors in graph.values()):
-        labels = nx.get_edge_attributes(G, 'weight')
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=labels)
-    plt.title(title)
-    plt.show()
-
-# Функция замера времени выполнения алгоритмов
-def measure_time(func, graph, start):
-    start_time = time.time()
-    result = func(graph, start)
-    end_time = time.time()
-    return result, end_time - start_time
-
-# Выполнение алгоритмов и измерение времени
-bfs_small, time_bfs_small = measure_time(bfs, small_graph, 0)
-dfs_small, time_dfs_small = measure_time(dfs, small_graph, 0)
-bfs_medium, time_bfs_medium = measure_time(bfs, medium_graph, 0)
-dfs_medium, time_dfs_medium = measure_time(dfs, medium_graph, 0)
-dijkstra_weighted, time_dijkstra_weighted = measure_time(dijkstra, weighted_graph, 0)
-
-# Вывод результатов
-print("BFS (малый граф):", bfs_small, "Время:", time_bfs_small)
-print("DFS (малый граф):", dfs_small, "Время:", time_dfs_small)
-print("BFS (средний граф):", bfs_medium, "Время:", time_bfs_medium)
-print("DFS (средний граф):", dfs_medium, "Время:", time_dfs_medium)
-print("Дейкстра (взвешенный граф):", dijkstra_weighted, "Время:", time_dijkstra_weighted)
-
-# Визуализация графиков времени выполнения
-algorithms = ["BFS Small", "DFS Small", "BFS Medium", "DFS Medium", "Dijkstra"]
-times = [time_bfs_small, time_dfs_small, time_bfs_medium, time_dfs_medium, time_dijkstra_weighted]
-plt.figure(figsize=(8, 5))
-plt.bar(algorithms, times, color=['blue', 'green', 'blue', 'green', 'red'])
-plt.xlabel("Алгоритмы")
-plt.ylabel("Время (сек)")
-plt.title("Сравнение времени выполнения алгоритмов")
+plt.figure(figsize=(10, 6))
+plt.plot(sizes, bfs_times, marker='o', label='BFS', linestyle='-', color='r')
+plt.plot(sizes, dfs_times, marker='o', label='DFS', linestyle='-', color='g')
+plt.plot(sizes, dijkstra_times, marker='o', label='Дейкстра', linestyle='-', color='b')
+plt.xlabel('Размер графа (количество вершин)')
+plt.ylabel('Время выполнения (сек)')
+plt.title('Сравнение времени выполнения BFS, DFS и Дейкстры')
+plt.legend()
+plt.grid(True)
 plt.show()
-
-# Визуализация графов
-draw_graph(small_graph, "Малый невзвешенный граф")
-draw_graph(medium_graph, "Средний невзвешенный граф")
-draw_graph(weighted_graph, "Взвешенный граф")
