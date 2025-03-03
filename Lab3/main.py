@@ -1,3 +1,4 @@
+
 import json
 import heapq
 import math
@@ -6,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def load_maze(file_path):
-    with open(file_path, 'r') as file:
+    with open(file_path, 'r', encoding='utf-8') as file:
         return json.load(file)
 
 def heuristic_manhattan(a, b):
@@ -15,7 +16,7 @@ def heuristic_manhattan(a, b):
 def heuristic_euclidean(a, b):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
-def a_star_search(maze_data, heuristic):
+def a_star_search(maze_data, heuristic, allow_diagonal=False):
     width, height = maze_data['width'], maze_data['height']
     start, goal = tuple(maze_data['start']), tuple(maze_data['goal'])
     maze = maze_data['maze']
@@ -42,28 +43,34 @@ def a_star_search(maze_data, heuristic):
         
         x, y = current
         neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+        if allow_diagonal:
+            neighbors.extend([(x+1, y+1), (x-1, y-1), (x+1, y-1), (x-1, y+1)])
         
         for neighbor in neighbors:
             nx, ny = neighbor
-            if 0 <= nx < width and 0 <= ny < height and maze[ny][nx] == 0:
-                tentative_g_score = g_score[current] + 1
-                
-                if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
-                    came_from[neighbor] = current
-                    g_score[neighbor] = tentative_g_score
-                    f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, goal)
-                    heapq.heappush(open_list, (f_score[neighbor], neighbor))
+            # Проверка границ перед доступом к maze[ny][nx]
+            if 0 <= nx < width and 0 <= ny < height:
+                if maze[ny][nx] == 0:  # Теперь доступ к maze[ny][nx] безопасен
+                    tentative_g_score = g_score[current] + (1.414 if allow_diagonal and (x, y) != (nx, ny) else 1)
+                    
+                    if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
+                        came_from[neighbor] = current
+                        g_score[neighbor] = tentative_g_score
+                        f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, goal)
+                        heapq.heappush(open_list, (f_score[neighbor], neighbor))
     
     return None, visited_nodes
 
-def visualize_maze(maze_data, path):
+def visualize_maze(maze_data, path, allow_diagonal=False):
     maze = np.array(maze_data['maze'])
     _, ax = plt.subplots()
     
-    ax.imshow(maze, cmap='gray_r')
+    ax.imshow(maze, cmap='binary', origin='upper')
+    ax.set_xticks([])
+    ax.set_yticks([])
     
-    for y in range(maze.shape[0]):
-        for x in range(maze.shape[1]):
+    for x in range(maze_data['width']):
+        for y in range(maze_data['height']):
             if (x, y) == tuple(maze_data['start']):
                 ax.text(x, y, 'S', ha='center', va='center', color='green', fontsize=12, fontweight='bold')
             elif (x, y) == tuple(maze_data['goal']):
@@ -72,6 +79,12 @@ def visualize_maze(maze_data, path):
     if path:
         for (x, y) in path:
             ax.add_patch(plt.Circle((x, y), 0.3, color='blue', alpha=0.6))
+        
+        # Draw lines between path nodes
+        for i in range(len(path) - 1):
+            x1, y1 = path[i]
+            x2, y2 = path[i + 1]
+            ax.plot([x1, x2], [y1, y2], 'b-', linewidth=2)
     
     plt.show()
 
@@ -86,10 +99,10 @@ def compare_heuristics(file_paths):
         visualize_maze(maze_data, path_manhattan)
         
         start_time = time.perf_counter()
-        path_euclidean, visited_euclidean = a_star_search(maze_data, heuristic_euclidean)
+        path_euclidean, visited_euclidean = a_star_search(maze_data, heuristic_euclidean, allow_diagonal=True)
         euclidean_time = time.perf_counter() - start_time
-        visualize_maze(maze_data, path_euclidean)
-
+        visualize_maze(maze_data, path_euclidean, allow_diagonal=True)
+        
         results[file_path] = {
             "manhattan": {"path_length": len(path_manhattan) if path_manhattan else 0, "visited_nodes": visited_manhattan, "time": manhattan_time},
             "euclidean": {"path_length": len(path_euclidean) if path_euclidean else 0, "visited_nodes": visited_euclidean, "time": euclidean_time}
@@ -99,12 +112,15 @@ def compare_heuristics(file_paths):
 
 if __name__ == "__main__":
     file_paths = [
-        "./Lab3/maze1.json",
-        "./Lab3/maze2.json"
+        "maze1.json",
+        "maze2.json",
+        "maze_10x10.json",
+        "maze_20x20.json",
+        "maze_30x30.json"
     ]
     results = compare_heuristics(file_paths)
     
     for file_path, result in results.items():
-        print(f"\nMaze from {file_path}:")
+        print(f"Maze from {file_path}:")
         print(f"Manhattan Heuristic: Path Length = {result['manhattan']['path_length']}, Visited Nodes = {result['manhattan']['visited_nodes']}, Time = {result['manhattan']['time']:.6f} sec")
         print(f"Euclidean Heuristic: Path Length = {result['euclidean']['path_length']}, Visited Nodes = {result['euclidean']['visited_nodes']}, Time = {result['euclidean']['time']:.6f} sec")
